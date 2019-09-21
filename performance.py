@@ -3,16 +3,16 @@ from decimal import Decimal
 from prettytable import PrettyTable
 import time
 import itertools
-
+import math
 
 template = """
-def inner(it, timer{init}):
+def inner(it, timer):
     def empty():
-        t0=timer()
+        t00=timer()
         for i in it:
             continue
-        t1=timer()
-        return t1-t0
+        t01=timer()
+        return t01-t00
     t0 = timer()
     for i in it:
         {stmt}
@@ -26,7 +26,7 @@ class Timer:
         self.timer = time.perf_counter
         local_ns = {}
         global_ns = globals
-        src = template.format(stmt=expr, init="")
+        src = template.format(stmt=expr)
         code = compile(src, 'dummy', 'exec')
         exec(code, global_ns, local_ns)
         self.inner = local_ns['inner']
@@ -37,16 +37,11 @@ class Timer:
         return timing
 
     def mintime(self, repeat=5, number=10 ** 6):
-        m = 1
-        for _ in range(repeat):
-            n = self.numtime(number)
-            if m > n:
-                m = n
-        return m / number
+        return min([self.numtime(number) for _ in range(repeat)]) / number
 
 
-def timeit(expr, globals, number):
-    return Timer(expr, globals).mintime(number=number)
+def timeit(expr, glbls, number):
+    return Timer(expr, glbls).mintime(number=number)
 
 
 def expression(x, y, operator, typeval):
@@ -58,14 +53,14 @@ def expression(x, y, operator, typeval):
     elif typeval == 'float':
         a = x * 100
         b = y * 100
-        iterations = 10 ** 5
+        iterations = 10 ** 6
     elif typeval == 'str':
         iterations = 10 ** 3
         if operator == '+':
-            a = str(round(x * 100, 3))
-            b = str(round(y * 100, 3))
+            a = str(round(x * 1000))
+            b = str(round(y * 1000))
         elif operator == '*':
-            a = str(round(x * 100, 3))
+            a = str(round(x * 1000))
             b = int(y * 100)
     return timeit('a' + operator + 'b', locals(), iterations)
 
@@ -83,16 +78,16 @@ def create_table():
             else:
                 current_expr = 1 / expression(x, y, operator, typeval)
             percent = round(100 * current_expr / int_add)
-            bar = 'X' * round(0.4 * percent)
+            bar = 'X' * math.floor(0.4 * percent)
             res.append([operator, typeval, '%6e' % Decimal(current_expr), bar, str(percent) + '%'])
     return res
 
 
-random.seed(1234)
 pt = PrettyTable()
 pt.field_names = ['operator', 'operand type', 'times in one second', 'diagram', 'percent']
 pt.align['diagram'] = 'l'
 for row in create_table():
     pt.add_row(row)
 print(pt)
+
 
